@@ -1,4 +1,4 @@
-# Gold Price Analysis & Prediction 📈
+# Gold Price Analysis & Prediction
 
 ## Overview
 
@@ -23,6 +23,10 @@ This project analyzes historical gold price data to identify long-term trends, s
 
 ![Historical Trend](images/graph1_trend.png)
 
+- **Long-term Growth**: Identifies the overall upward trajectory of gold, confirming its status as a reliable safe-haven asset for long-term investors.
+
+- **Market Events**: Highlights significant price spikes and drops that correlate with major global economic shifts and geopolitical events.
+
 - **Insight:** Analyzes the long-term growth of gold as a safe-haven asset over the past decade.
 
 ### 2. Moving Average Analysis (MA50 vs MA200)
@@ -37,7 +41,7 @@ This project analyzes historical gold price data to identify long-term trends, s
 
 ### 3. Monthly Volatility Analysis
 
-![Monthly Volatility](images/graph3_monthly_box.png)
+![Monthly Volatility](images/graph3_monthly_volatility_box.png)
 
 - **Seasonal Patterns**: Pinpoints specific months that historically experience the highest price swings, helping investors time their entries.
 
