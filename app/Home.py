@@ -16,7 +16,7 @@ from datetime import date
 import numpy as np
 import streamlit as st
 
-from lib import md_safe
+from lib.text import md_safe
 from lib.charts import price_trend
 from lib.data import (
     active_range,

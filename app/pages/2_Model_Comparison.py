@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
-from lib import md_safe
+from lib.text import md_safe
 from lib.charts import mae_by_model, predicted_vs_actual, rolling_error
 from lib.data import (
     DEFAULT_MODELS,

@@ -42,6 +42,24 @@ python scripts/smoke_check.py # data, page imports, app render, date filter
 python scripts/leakage_check.py # proves the harness still catches look-ahead
 ```
 
+## Deploying to Streamlit Community Cloud
+
+Point the app at `app/Home.py` with `main` as the branch; `requirements.txt` is
+picked up automatically. Two things bit this project there and are worth
+knowing before you deploy:
+
+- **A running server does not reload imported packages.** Streamlit re-executes
+  the entry script when the repo changes, but anything already in
+  `sys.modules` stays as it was — so importing a *new* name from an existing
+  package fails with `ImportError: cannot import name ... from 'lib'` until the
+  process restarts. That is why `md_safe()` lives in its own module: a submodule
+  that did not exist before is always read from disk, so a half-reloaded server
+  keeps working. For any other case, **Manage app → Reboot** is the fix.
+- **The committed CSV is what Cloud reads.** The in-app refresh button writes to
+  the container's filesystem, which is discarded on the next restart. To update
+  the deployed data, run `python -m src.data_cleaning` locally and commit the
+  result.
+
 ## The app, page by page
 
 ### Overview
@@ -110,7 +128,8 @@ src/
   model.py                              # features, walk-forward, metrics, forecast
 app/
   Home.py                               # entry point, sidebar shell, landing page
-  lib/__init__.py                       # repo root + md_safe() ($ escaping)
+  lib/__init__.py                       # repo root only - keep it that way
+  lib/text.py                           # md_safe() - $ escaping for Markdown
   lib/data.py                           # cached loaders (no I/O at import)
   lib/charts.py                         # plotly builders
   pages/1_Analysis.py
@@ -206,7 +225,7 @@ item is a defect that was found by running the thing rather than by reading it.
 | Forecast anchor | The estimator predicted from the last *usable* feature row, silently one bar stale | Predicts from the last row that has features, target `NaN` or not |
 | Empty date range | Selecting a weekend crashed the landing page on `iloc[0]` | Warns and returns before touching the empty frame |
 | Chart baseline | `fill="tozeroy"` forced a `$0` axis, flattening a decade of price into the top fifth of the plot | Fill is anchored to the data minimum and the axis autoscales |
-| Currency in the UI | Two `$` in one Streamlit Markdown string were parsed as LaTeX, deleting both signs and re-rendering the text in a math font | `lib.md_safe()` escapes them at the render site, so library strings stay plain for the CLI |
+| Currency in the UI | Two `$` in one Streamlit Markdown string were parsed as LaTeX, deleting both signs and re-rendering the text in a math font | `lib.text.md_safe()` escapes them at the render site, so library strings stay plain for the CLI |
 
 The leakage fix is the one that mattered. The target for row `j` is the return
 from `j` to `j + horizon`, so a forecast for `close[t]` has to be built from row
