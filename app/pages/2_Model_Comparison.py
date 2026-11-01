@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
+from lib import md_safe
 from lib.charts import mae_by_model, predicted_vs_actual, rolling_error
 from lib.data import (
     DEFAULT_MODELS,
@@ -33,9 +34,15 @@ def render() -> None:
 
     verdict = load_verdict()
     if verdict.has_edge:
-        st.success(f"**{verdict.headline}**\n\n{verdict.detail}", icon="✅")
+        st.success(
+            f"**{md_safe(verdict.headline)}**\n\n{md_safe(verdict.detail)}",
+            icon="✅",
+        )
     else:
-        st.warning(f"**{verdict.headline}**\n\n{verdict.detail}", icon="🧭")
+        st.warning(
+            f"**{md_safe(verdict.headline)}**\n\n{md_safe(verdict.detail)}",
+            icon="🧭",
+        )
 
     st.subheader("1. The original model, scored honestly")
     st.markdown(
@@ -46,7 +53,7 @@ def render() -> None:
     st.dataframe(metrics_display(load_holdout_table()), width="stretch", hide_index=True)
     st.error(
         f"The OLS line is **{ratio:.1f}× worse** than naive "
-        f"(${ols_mae:,.1f} vs ${naive_mae:,.1f} MAE). It was fitted to a decade of "
+        f"(\\${ols_mae:,.1f} vs \\${naive_mae:,.1f} MAE). It was fitted to a decade of "
         "prices and then extrapolated a straight line into 2023–2026, where gold "
         "rose far faster than the fit expected.",
         icon="⚠️",
@@ -108,8 +115,9 @@ def render() -> None:
             "evaluation and never revisited.\n"
             "- **Refit cadence:** every 21 bars (about one trading month); the "
             "evaluation starts after the first 50% of the series.\n"
-            "- **The booster is off by default** because it loses to naive "
-            "($21.3 vs $19.2 MAE). It stays available via "
+            "- **The booster is off by default** because it loses to naive on "
+            "this data. `python -m src.model` prints its row alongside the three "
+            "below; it stays reachable from the API via "
             "`walk_forward_eval(..., include_boosting=True)`."
         )
         st.code(

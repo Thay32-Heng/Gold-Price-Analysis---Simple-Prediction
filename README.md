@@ -39,12 +39,41 @@ Reproduce the numbers without the UI:
 ```bash
 python -m src.model          # holdout audit + walk-forward table
 python scripts/smoke_check.py # data, page imports, app render, date filter
+python scripts/leakage_check.py # proves the harness still catches look-ahead
 ```
+
+## The app, page by page
+
+### Overview
+
+![Overview page](images/app_overview.png)
+
+The landing page leads with the price, the day's move, the 30-day change, daily
+volatility and — deliberately — **how old the data is**. The sidebar shows a
+freshness chip and a **Refresh from yfinance** button, because a dashboard that
+quietly displays an eight-month-old close is worse than one that admits it.
+
+### Model comparison
+
+![Model comparison page](images/app_model_comparison.png)
+
+Both tables on one page: the single chronological holdout that produces the
+headline, and the expanding-window walk-forward that produces the verdict. The
+banner states the result before the tables do, so nobody has to hunt for it.
+
+### Forecast
+
+![Forecast page](images/app_forecast.png)
+
+The point estimate is intentionally underwhelming — the naive model assumes no
+drift, so "in 30 trading days" is roughly today's price. The card that carries
+the information is the 80% band beside it, built from the model's own
+out-of-sample errors and widened by √time.
 
 ## The honest model comparison
 
 **Single chronological holdout** (fit on the first 80%, score the last 20% —
-559 bars):
+595 bars):
 
 | Predictor | MAE | MAPE |
 |---|---|---|
@@ -54,8 +83,8 @@ python scripts/smoke_check.py # data, page imports, app render, date filter
 The OLS line is **35.3× worse** than the naive forecast. It is kept in the app
 as a cautionary baseline, not as a model.
 
-**Expanding-window walk-forward** (refit every 21 bars, 1,397 evaluated bars,
-2020-07-27 → 2026-02-12):
+**Expanding-window walk-forward** (refit every 21 bars, 1,487 evaluated bars,
+2020-12-02 → 2026-10-29):
 
 | Model | MAE | RMSE | MAPE | Direction |
 |---|---|---|---|---|
@@ -81,6 +110,7 @@ src/
   model.py                              # features, walk-forward, metrics, forecast
 app/
   Home.py                               # entry point, sidebar shell, landing page
+  lib/__init__.py                       # repo root + md_safe() ($ escaping)
   lib/data.py                           # cached loaders (no I/O at import)
   lib/charts.py                         # plotly builders
   pages/1_Analysis.py
@@ -88,6 +118,7 @@ app/
   pages/3_Forecast.py
 images/                                 # figures referenced below
 scripts/smoke_check.py                  # headless verification
+scripts/leakage_check.py                # look-ahead regression probe
 .streamlit/config.toml                  # dark theme, gold accent
 ```
 
@@ -160,6 +191,45 @@ and it is idempotent — running it twice changes nothing.
 > looks reasonable in-sample because it is drawn through the same points it was
 > fitted on. Scored on data it has never seen, it is 35.3× worse than
 > predicting "tomorrow costs what it costs today".
+
+## What changed in this pass
+
+The repository originally shipped a notebook, a straight-line "prediction" and
+five static figures. Everything below was added or fixed afterwards, and each
+item is a defect that was found by running the thing rather than by reading it.
+
+| Area | Problem | Fix |
+|---|---|---|
+| Data currency | `end="2026-02-14"` hard-coded in the downloader, so the committed CSV froze in February | `END_DATE = None` (always the latest completed session) plus an in-app **Refresh from yfinance** button and a staleness chip |
+| Walk-forward leakage | Features were taken from bar `t` while the target was the return from `t`; the bar being predicted was an input | Features come from `t − horizon`, so the forecast uses only information available before the origin |
+| Training window | Rows whose forward return had not closed at the refit date could enter training | The newest legal training row is `train_end − 2·horizon` |
+| Forecast anchor | The estimator predicted from the last *usable* feature row, silently one bar stale | Predicts from the last row that has features, target `NaN` or not |
+| Empty date range | Selecting a weekend crashed the landing page on `iloc[0]` | Warns and returns before touching the empty frame |
+| Chart baseline | `fill="tozeroy"` forced a `$0` axis, flattening a decade of price into the top fifth of the plot | Fill is anchored to the data minimum and the axis autoscales |
+| Currency in the UI | Two `$` in one Streamlit Markdown string were parsed as LaTeX, deleting both signs and re-rendering the text in a math font | `lib.md_safe()` escapes them at the render site, so library strings stay plain for the CLI |
+
+The leakage fix is the one that mattered. The target for row `j` is the return
+from `j` to `j + horizon`, so a forecast for `close[t]` has to be built from row
+`t − horizon`; using row `t` puts the bar being predicted inside the model's
+input. On gold the effect is invisible — returns are almost uncorrelated, so the
+buggy forecast collapses onto the naive one, which is exactly why the bug
+survived. `scripts/leakage_check.py` runs the same harness on synthetic AR(1)
+series where the leak is measurable, comparing the fixed predictor against a
+faithful copy of the old one. Means over eight seeds, Ridge only:
+
+| Return autocorrelation φ | Fixed skill vs naive | Leaky skill vs naive | Leak effect |
+|---|---|---|---|
+| 0.0 (uncorrelated) | −0.32% | −0.32% | +0.01 pts |
+| 0.5 | +0.95% | +3.92% | **+2.96 pts** |
+| 0.9 | +20.95% | +27.22% | **+6.27 pts** |
+
+A single seed cannot carry that claim — the φ = 0 effect alone swings by about
+1.3 points between seeds, which is why the probe averages and reports a
+standard error instead of printing one draw. The script fails if the leak is
+visible where it should be impossible (a 99% band on the mean, so it proves "no
+leak bigger than ~1.7 points", not "exactly zero"), **and** fails if the probe
+can no longer detect the leak at φ = 0.9, so a passing result cannot come from
+a broken test.
 
 ## Limitations
 

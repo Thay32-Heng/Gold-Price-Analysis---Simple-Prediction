@@ -16,6 +16,7 @@ from datetime import date
 import numpy as np
 import streamlit as st
 
+from lib import md_safe
 from lib.charts import price_trend
 from lib.data import (
     active_range,
@@ -196,16 +197,22 @@ def _render_landing() -> None:
     st.error(
         f"On a single chronological holdout the OLS trend line is "
         f"**{ratio:.1f}× worse** than the naive forecast "
-        f"(${ols_mae:,.1f} vs ${naive_mae:,.1f} MAE). It is a straight line drawn "
+        f"(\\${ols_mae:,.1f} vs \\${naive_mae:,.1f} MAE). It is a straight line drawn "
         "through a curve, extrapolated into the future.",
         icon="⚠️",
     )
 
     verdict = load_verdict()
     if verdict.has_edge:
-        st.success(f"**{verdict.headline}** {verdict.detail}", icon="✅")
+        st.success(
+            f"**{md_safe(verdict.headline)}** {md_safe(verdict.detail)}",
+            icon="✅",
+        )
     else:
-        st.warning(f"**{verdict.headline}** {verdict.detail}", icon="🧭")
+        st.warning(
+            f"**{md_safe(verdict.headline)}** {md_safe(verdict.detail)}",
+            icon="🧭",
+        )
 
     st.subheader("Limitations — read these before using any number")
     st.markdown(

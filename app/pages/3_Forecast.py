@@ -73,8 +73,11 @@ def render() -> None:
         )
     )
     right.metric(
-        "80% of outcomes land between",
-        f"${low:,.0f}  –  ${high:,.0f}",
+        "80% of outcomes (USD/oz)",
+        # No currency symbols inside the value: Streamlit treats text between
+        # two ``$`` as LaTeX, which swallowed them and rendered the range in a
+        # math font with wide gaps.
+        f"{low:,.0f} – {high:,.0f}",
         border=True,
     )
     right.caption(
