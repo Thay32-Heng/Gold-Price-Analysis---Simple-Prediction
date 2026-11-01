@@ -1,7 +1,17 @@
-pandas
-matplotlib
-seaborn
-scikit-learn
-yfinance
-numpy
-notebook
+# Core data stack
+pandas==3.1.0
+numpy==2.4.6
+
+# Modelling (scipy comes in as a scikit-learn dependency)
+scikit-learn==1.9.1
+
+# Data source (only needed to rebuild data/process from scratch)
+yfinance==1.7.0
+
+# Notebook plots
+matplotlib==3.10.8
+seaborn==0.13.2
+
+# Streamlit app
+streamlit==1.66.1
+plotly==7.1.0

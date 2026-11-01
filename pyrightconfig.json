@@ -1,0 +1,24 @@
+{
+  "include": [
+    "app",
+    "src",
+    "scripts"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    "data",
+    "notebooks"
+  ],
+  "extraPaths": [
+    ".",
+    "app",
+    "src",
+    ".venv/lib/python3.14/site-packages"
+  ],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "standard",
+  "reportMissingImports": "error",
+  "reportUnusedImport": "warning",
+  "reportUnusedVariable": "warning"
+}

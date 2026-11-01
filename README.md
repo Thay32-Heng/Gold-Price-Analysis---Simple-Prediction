@@ -1,23 +1,109 @@
 # Gold Price Analysis & Prediction
 
-## Overview
+An analysis of COMEX gold futures (`GC=F`) that is honest about what a
+time-series model can and cannot do. It ships a Streamlit app, a leakage-free
+walk-forward evaluation, and a cautionary baseline: the original "prediction"
+in this repository is a straight line that is **35.3× worse than doing
+nothing**.
 
-This project analyzes historical gold price data to identify long-term trends, seasonal volatility, and market signals using Moving Averages. It also includes a simple Machine Learning model to predict future price directions.
+## What the app does
 
-## Project Structure
+- **Market analysis** — trend, MA50/MA200 crossovers, monthly seasonality,
+  return distribution, all filtered by a date range.
+- **Model comparison** — the same models scored two ways: a single
+  chronological holdout, and an expanding-window walk-forward with no
+  shuffling and no leakage.
+- **Forecast** — a point estimate and a residual-based 80% band for 1–60
+  trading days ahead, with the reason the band is wide written next to it.
 
-- `data/processed/`: Cleaned dataset (`gold_cleaned.csv`).
-- `notebooks/`: Jupyter Notebook containing the full EDA and Prediction model.
-- `src/`: Python scripts for automated data cleaning.
-- `images/`: Saved visualizations for documentation.
+Every page states its takeaway in one sentence, including the uncomfortable
+one: at a one-day horizon nothing here beats "tomorrow costs what it costs
+today".
 
-## How to Run
+## Run it
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run data cleaning: `python src/data_cleaning.py`
-3. Explore the analysis: Open `notebooks/exploration.ipynb`
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-## Visualizations & Insights
+streamlit run app/Home.py
+```
+
+Then open <http://localhost:8501>. The app reads the committed CSV at
+`data/process/cleaned_gold_price_data.csv`; it never downloads anything at
+start-up.
+
+Reproduce the numbers without the UI:
+
+```bash
+python -m src.model          # holdout audit + walk-forward table
+python scripts/smoke_check.py # data, page imports, app render, date filter
+```
+
+## The honest model comparison
+
+**Single chronological holdout** (fit on the first 80%, score the last 20% —
+559 bars):
+
+| Predictor | MAE | MAPE |
+|---|---|---|
+| Naive (tomorrow = today) | $40.16 | 1.05% |
+| OLS straight line on `days_since_start` | $1,418.54 | 36.11% |
+
+The OLS line is **35.3× worse** than the naive forecast. It is kept in the app
+as a cautionary baseline, not as a model.
+
+**Expanding-window walk-forward** (refit every 21 bars, 1,397 evaluated bars,
+2020-07-27 → 2026-02-12):
+
+| Model | MAE | RMSE | MAPE | Direction |
+|---|---|---|---|---|
+| Naive (last price) | $23.78 | $41.07 | 0.83% | — |
+| Ridge on lagged returns, MA gap, volatility | $23.74 | $41.04 | 0.83% | 52.9% |
+| HistGradientBoosting (same features) | $24.34 | $42.40 | 0.85% | 50.6% |
+| OLS trend (strawman) | $467.15 | $741.14 | 13.49% | 47.3% |
+
+Ridge "wins" by $0.04 per bar, which is noise. Its 52.9% directional accuracy
+sits *below* the share of up-days in the window (53.9%), so it is not evidence
+of skill either. **Verdict: no model beats naive at a 1-day horizon.** The
+boosting model is excluded from the default comparison because it loses.
+
+## Project structure
+
+```
+data/
+  process/cleaned_gold_price_data.csv   # committed, 2,975 rows, 2015-01-02 → 2026-10-30
+  create_data.py                        # raw download helper
+notebooks/exploration.ipynb             # the original EDA and the OLS plot
+src/
+  data_cleaning.py                      # download + normalise yfinance layouts
+  model.py                              # features, walk-forward, metrics, forecast
+app/
+  Home.py                               # entry point, sidebar shell, landing page
+  lib/data.py                           # cached loaders (no I/O at import)
+  lib/charts.py                         # plotly builders
+  pages/1_Analysis.py
+  pages/2_Model_Comparison.py
+  pages/3_Forecast.py
+images/                                 # figures referenced below
+scripts/smoke_check.py                  # headless verification
+.streamlit/config.toml                  # dark theme, gold accent
+```
+
+## Rebuilding the data
+
+`data/raw/` is git-ignored. To regenerate the cleaned file from yfinance:
+
+```bash
+python -m src.data_cleaning
+```
+
+The loader normalises every yfinance layout it has produced over the years
+(flat header, `MultiIndex` header, and the two metadata rows `Ticker`/`Date`),
+and it is idempotent — running it twice changes nothing.
+
+## Visualisations & insights
 
 ### 1. Historical Price Trend
 
@@ -69,3 +155,19 @@ This project analyzes historical gold price data to identify long-term trends, s
 
 - **Insight:** Evaluates the Linear Regression model performance in tracking actual price movements.
 - **Model Equation:** $y = mx + b$
+
+> This chart is the reason the rest of the project exists. The regression line
+> looks reasonable in-sample because it is drawn through the same points it was
+> fitted on. Scored on data it has never seen, it is 35.3× worse than
+> predicting "tomorrow costs what it costs today".
+
+## Limitations
+
+- **One-day gold forecasting is close to random.** The walk-forward
+  comparison is the evidence, not an opinion.
+- **`GC=F` is a futures contract.** It carries roll effects and is quoted in
+  USD per troy ounce; it is not the price you would pay at a coin shop.
+- **The 80% band is wide by construction.** It comes from the model's own
+  out-of-sample errors, widened by the square root of time.
+- **Nothing here is investment advice.** The project exists to demonstrate how
+  easily a time-series model can look clever and be useless.

@@ -8,7 +8,7 @@ data_dir.mkdir(exist_ok=True)
 
 # download gold price data
 print('Downloading gold price data...')
-gold_data = yf.download('GC=F', start='2015-01-01', end='2026-02-14')
+gold_data = yf.download('GC=F', start='2015-01-01')  # to the latest session
 
 # save data to csv
 csv_path = data_dir / 'gold_price_data.csv'
